@@ -40,7 +40,9 @@ clear
 load dsSleepStudyData
 %% Load dataset SpeepStudyData and create the model design matrices 
 formula  = 'Reaction ~ Days + (1 | Subject) + (-1+Days | Subject)';
-model = hpmixedmodel(SleepStudyData,formula);
+%opts.dummyVarCode = 'reference';
+opts.dummyVarCode = 'effects';
+model = hpmixedmodel(SleepStudyData,formula,opts);
 model.Description = 'SleepStudyData: R lme4 Example';
 
 %% Fit the linear mixed model by HPMIXED with limitted  output
@@ -54,6 +56,8 @@ lmefit = hpmixed(model,opts);
 disp(lmefit)
 
 %% EXAMPLE 1: (Statistics for FIXED and RANDOM effects and FITTED values)
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
 
 STAT_FE = getStats('fixed',lmefit);
 disp(STAT_FE)
@@ -71,9 +75,50 @@ xlabel('y observed')
 ylabel('y fitted')
 title('SleepStudy Data Fitted by HPMIXED')
 
+%% Plot the fitted subjects
+% yfit =STAT_FIT.TABLE.Estimate;
+% day = SleepStudyData.Days;
+% t = linspace(0,9)';
+% FE = lmefit.fixedEffects.Estimates;
+% RE = lmefit.randomEffects.Estimates;
+% plot(day,model.y,'o')
+% hold on
+% for i = 1:18
+% color = rand(3,1);
+% plot(day(1:10),model.y((i-1)*10+(1:10)),'o','Color',color,'LineWidth',2)
+% line(t,(FE(1)+RE(i))+(FE(2)+RE(18+i))*t,'Color',color,'LineWidth',2)
+% end
+% hold off
+
+%% Fit the linear mixed model by MIXED
+% dim = [18 18];
+% s20 = [1 1 1];
+% method = 2;
+% tic;
+% [s2,b,u,Is2,C] = mixed(model.y,model.X,model.Z,dim,s20,method);
+% toc
+% disp(s2)
+
+%% Fit the linear mixed model by FITLME
+% tic;
+% lme = fitlme(SleepStudyData,formula,'FitMethod','REML');
+% toc
+% 
+% disp(lme)
+%% EXAMPLE: (BROAD INFERENCE SPACE for LSMEANS of the factor Subject)
+
+options.STAT.inference = 'lsmeans';
+options.STAT.inferenceSpace = 'broad';
+%options.STAT.inferenceSpace = 'narrow';
+[Lambda,options]  = getLambda({'Subject'},model,SleepStudyData,options);
+options.STAT.alpha = 0.01;
+STAT_Subject = getStats(Lambda,lmefit,options);
+disp(STAT_Subject)
 %% Fit the linear mixed model by FITLME
 tic;
-lme = fitlme(SleepStudyData,formula,'FitMethod','REML');
+lme = fitlme(SleepStudyData,formula,'DummyVarCoding','effects','FitMethod','REML');
 toc
 
 disp(lme)
+
+anova(lme,'DFMethod','Satterthwaite')

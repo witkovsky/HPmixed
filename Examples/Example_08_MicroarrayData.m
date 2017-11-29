@@ -55,11 +55,13 @@ load dsMicroarrayData
 % Otherwise use provided model structure, or construct it manually
 
 %formula  = 'log2i ~ Trt + (1 | Gene) + (1 | MArray:Dye:Pin:Dip)';
-%formula  = 'log2i ~ Dye + Trt + Gene + (1 | MArray) + (1 | MArray:Gene)';
-formula  = 'log2i ~   Trt:Gene  +  (1 | MArray)';
+formula  = 'log2i ~ Dye + Trt + Gene + (1 | MArray) + (1 | MArray:Gene)';
+%formula  = 'log2i ~   Trt:Gene  +  (1 | MArray)';
 
+opts.dummyVarCode = 'reference';
+%opts.dummyVarCode = 'effects';
 tic;
-model = hpmixedmodel(MicroArrayData,formula);
+model = hpmixedmodel(MicroArrayData,formula,opts);
 toc
 model.Description = 'MicroArrayData: SAS PROC HPMIXED Example';
 
@@ -74,6 +76,19 @@ opts.verbose = true;
 lmefit = hpmixed(model,opts);
 
 disp(lmefit)
+
+%% ANOVA
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
+
+%% Effect Significance
+options.STAT.inference = 'contrasts';
+options.STAT.inferenceSpace = 'broad';
+options.STAT.ddfMethod = 'faicornelius';
+[Lambda,options]  = getLambda({'Gene'},model,MicroArrayData,options);
+
+STAT_Gene = getStats(Lambda,lmefit,options);
+disp(STAT_Gene)
 
 %% Fit the linear mixed model by FITLME (! Long execution time !)
 % tic;

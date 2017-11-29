@@ -1,11 +1,11 @@
 function [Lambda,options] = getLambda(varNames,model,dataset,options)
 % getLambda creates the coefficient matrix Lambda for LSMEANS and their
-%  CONTRASTS and PAIRWISE contrasts for computing the basic t-statistics
-%  resp. F-statistics and their p-values by using calcSTAT (Satterthwaite's
-%  approximation of the degrees of freedom).
+% CONTRASTS and PAIRWISE contrasts for computing the basic t-statistics
+% resp. F-statistics and their p-values by using calcSTAT (Satterthwaite's
+% approximation of the degrees of freedom).
 %
 % EXAMPLE: (LSMEANS contrasts for interaction A:B)
-%   load dsSplitPlotData;
+%   load SplitPlotData;
 %   formula  = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
 %   model = hpmixedmodel(SplitPlotData,formula);
 %
@@ -121,6 +121,12 @@ switch lower(options.STAT.inference)
         pairs = pairs - sparse(1:nPairs,indJ,1,nPairs,numLevels);
         Lambda = Lambda * pairs';
         Description = ['STAT TABLE: Pairwise comparisons, ', Description];
+    otherwise
+        colNames = cell(numLevels,1);
+        for i = 1:numLevels
+            colNames{i} = [grpName,'_',labels{i}];
+        end
+        Description = ['STAT TABLE: LSmeans, ', Description];  
 end
 
 Description = [Description,' ', 'VARIABLE: ',grpName];

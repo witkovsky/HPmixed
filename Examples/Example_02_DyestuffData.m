@@ -45,7 +45,9 @@ clear
 load dsDyestuffData
 %% Create the model design matrices 
 formula  = 'Yield ~ 1 + (1 | Batch)';
-model = hpmixedmodel(DyestuffData,formula);
+%opts.dummyVarCode = 'reference';
+opts.dummyVarCode = 'effects';
+model = hpmixedmodel(DyestuffData,formula,opts);
 model.Description = 'DyestuffData: Dyestuff R Example';
 
 %% Fit the linear mixed model by HPMIXED with limitted  output
@@ -58,6 +60,8 @@ lmefit = hpmixed(model);
 
 disp(lmefit)
 %% EXAMPLE 1: (Statistics for FIXED and RANDOM effects and FITTED values)
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
 
 STAT_FE = getStats('fixed',lmefit);
 disp(STAT_FE)

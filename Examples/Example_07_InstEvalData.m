@@ -48,11 +48,14 @@ load dsInstEvalData
 
 %% Create the model design matrices 
 formula  = 'y ~ dept*service + (1|s) + (1|d)';
-model = hpmixedmodel(InstEvalData,formula);
+
+%opts.dummyVarCode = 'reference';
+opts.dummyVarCode = 'effects';
+model = hpmixedmodel(InstEvalData,formula,opts);
 model.Description = 'InstEvalData: InstEval R Example';
 
 %% Fit the linear mixed model by HPMIXED with limitted  output
-opts.verbose = false;
+%opts.verbose = false;
 opts.ddfMethod = 'residual';
 % opts.ddfMethod = 'Satterthwaite';
 opts.isExactGrad = 0;
@@ -65,6 +68,10 @@ disp(lmefit.ModelInfo)
 disp(lmefit.fixedEffects.Statistics.TABLE(1:20,:))
 disp(lmefit.randomEffects.Statistics.TABLE(1:20,:))
 disp(lmefit.varianceComponents.Statistics.TABLE)
+
+%% ANOVA
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
 
 %% Fit the linear mixed model by FITLME
 tic;

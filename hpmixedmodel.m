@@ -22,13 +22,12 @@ function model = hpmixedmodel(ds, formula, options)
 %% CHECK INPUTS / OUTPUTS
 narginchk(2,3);
 
-if nargin < 3
-    options = [];
-end
+if nargin < 3, options = []; end
 
-if ~isfield(options, 'verbose')
-    options.verbose = true;
-end
+if ~isfield(options, 'verbose'), options.verbose = true; end
+%if ~isfield(options, 'dummyVarCode'), options.dummyVarCode = 'full'; end
+%if ~isfield(options, 'dummyVarCode'), options.dummyVarCode = 'reference'; end
+if ~isfield(options, 'dummyVarCode'), options.dummyVarCode = 'effects'; end
 
 F = classreg.regr.LinearMixedFormula(formula,ds.Properties.VarNames);
 model.Formula = F;
@@ -64,7 +63,7 @@ end
     'Model',F.FELinearFormula.Terms(:,DatasetsVarLocation),...
     'PredictorVars',F.FELinearFormula.PredictorNames,...
     'ResponseVar',F.ResponseName,...
-    'DummyVarCoding','reference');
+    'DummyVarCoding',options.dummyVarCode);
 
 if options.verbose
     model.FixedInfo.XCols2Terms = XCols2Terms;
@@ -122,6 +121,20 @@ if options.verbose
 end
 model.Z = sparseZ(Z,q,lev,Gid);
 model.dimRE = lev;
+
+% Most of the information is in Model.Formula
+model.VarInfo.nVars = nVars;
+model.VarInfo.VarNames = VarNames;
+model.VarInfo.VarNames = VarNames;
+model.VarInfo.IsCategorical = IsCategorical;
+model.VarInfo.DatasetsVarLocation = DatasetsVarLocation;
+model.VarInfo.ResponseName = F.ResponseName;
+model.VarInfo.PredictorNames = F.FELinearFormula.PredictorNames;
+model.VarInfo.XColNames = XColNames;
+model.VarInfo.XCols2Terms = XCols2Terms;
+model.VarInfo.Terms = F.FELinearFormula.Terms(:,DatasetsVarLocation);
+model.VarInfo.TermNames = model.Formula.FELinearFormula.TermNames;
+
 end
 
 %% Function intvars

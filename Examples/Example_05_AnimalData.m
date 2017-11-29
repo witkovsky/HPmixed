@@ -47,6 +47,10 @@ lmefit = hpmixed(model,opts);
 
 disp(lmefit)
 
+%% ANOVA
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
+
 %% Fit the linear mixed model by FITLME
 tic;
 lme = fitlme(SASAnimalData,formula,'FitMethod','REML');

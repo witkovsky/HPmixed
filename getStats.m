@@ -96,6 +96,7 @@ if ~isfield(options.STAT, 'Description'), options.STAT.Description = ''; end
 if ~isfield(options.STAT, 'colnames'), options.STAT.colnames = 'fit_'; end
 if ~isfield(options.STAT, 'effectID'), options.STAT.effectID = []; end
 if ~isfield(options.STAT, 'ddfMethod'), options.STAT.ddfMethod = 'Satterthwaite'; end
+if ~isfield(options.STAT, 'isFitConditional'), options.STAT.isFitConditional = true; end
 
 %% Get the required information from the fittetd model (lmefit)
 sig2        = lmefit.varianceComponents.Estimates;
@@ -150,8 +151,13 @@ elseif ischar(Lambda)
             options.STAT.Description = 'Estimated RANDOM and FIXED effects';
         case {'fitted' 'fit' 'yhat'}
             try
-                Lambda = [lmefit.Details.Model.Z ...
-                    sparse(lmefit.Details.Model.X)]';
+                if options.STAT.isFitConditional
+                    Lambda = [lmefit.Details.Model.Z ...
+                        sparse(lmefit.Details.Model.X)]';
+                else
+                    Lambda = [sparse(n,q) ...
+                        sparse(lmefit.Details.Model.X)]';
+                end
             catch
                 error('VW:hpmixed:getStats', ...
                     'MISSING INPUT: lmefit.Details.Model ... ')
@@ -344,7 +350,8 @@ function [STAT,mse] = createFTESTtable(fstat,mse,ddf,ndf,options)
 
 %% Set the variables and create the table
 alpha = options.STAT.alpha;
-colnames = options.STAT.grpname;
+%if ~isfield(options.STAT, 'grpname'), options.STAT.grpname = 'GRP'; end
+colnames = options.STAT.colnames;
 
 quantile    = finv(1-alpha,ndf,ddf);
 pval        = 1 - fcdf(fstat,ndf,ddf);
@@ -355,8 +362,11 @@ if size(ddf,1) == 1
 end
 
 VarNames = {'Fstat' 'NDF' 'DDF' 'Quantile' 'pValue'};
+% STAT = dataset(fstat, ndf, ddf, quantile, pval, ...
+%     'VarNames',VarNames,'ObsNames',colnames);
+
 STAT = dataset(fstat, ndf, ddf, quantile, pval, ...
-    'VarNames',VarNames,'ObsNames',colnames);
+    'VarNames',VarNames);
 
 STAT.Properties.Description = options.STAT.Description;
 end     % END of createTTESTtable

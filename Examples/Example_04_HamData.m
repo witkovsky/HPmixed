@@ -46,7 +46,10 @@ load dsHamData
 % formula  = 'Informedliking ~  Product*Information*Gender + (1|Product:Consumer)';
 formula  = 'Informedliking ~  Product*Information*Gender + (1|Consumer)';
 % formula  = 'Informedliking ~  Information*Gender + (1|Consumer)';
-model = hpmixedmodel(HamData,formula);
+
+%opts.dummyVarCode = 'reference';
+opts.dummyVarCode = 'effects';
+model = hpmixedmodel(HamData,formula,opts);
 model.Description = 'HamData: R lmerTest Example';
 
 %% Fit the linear mixed model by HPMIXED
@@ -55,6 +58,9 @@ lmefit = hpmixed(model);
 disp(lmefit)
 
 %% EXAMPLE 1: (Statistics for FIXED and RANDOM effects and FITTED values)
+
+STAT_ANOVA = getAnova(lmefit);
+disp(STAT_ANOVA)
 
 STAT_FE = getStats('fixed',lmefit);
 disp(STAT_FE)
@@ -84,11 +90,16 @@ disp(STAT_Product_LSMEANS_NARROW)
 
 %% EXAMPLE: (Broad INFERENCE SPACE for LSMEANS of the factor Product)
 
-options.STAT.inference = 'lsmeans';
-options.STAT.inferenceSpace = 'broad';
+%options.STAT.inference = 'lsmeans';
+options.STAT.inference = 'contrasts';
+%options.STAT.inferenceSpace = 'broad';
+options.STAT.inferenceSpace = 'intermediate';
+options.STAT.includedXcols = [7 (14:16)];
 
-[Lambda,options]  = getLambda({'Product'},model,HamData,options);
+[Lambda,options]  = getLambda({'Gender' 'Information'},model,HamData,options);
+Lambda = Lambda(:,end);
 
+options.STAT.ddfMethod = 'FaiCornelius';
 STAT_Product_LSMEANS_BROAD = getStats(Lambda,lmefit,options);
 disp(STAT_Product_LSMEANS_BROAD)
 
@@ -105,7 +116,16 @@ disp(STAT_Product_COMPARISONS)
 
 %% Fit the linear mixed model by FITLME
 tic;
-lme = fitlme(HamData,formula,'FitMethod','REML');
+lme = fitlme(HamData,formula,'DummyVarCoding','effects','FitMethod','REML');
 toc
 
 disp(lme)
+
+%% ANOVA 
+anova(lme)
+anova(lme,'DFMethod','Satterthwaite')
+%% Fit the linear mixed model by FITLME
+tic;
+lme = fitlme(HamData,formula,'FitMethod','REML');
+toc
+anova(lme,'DFMethod','Satterthwaite')
