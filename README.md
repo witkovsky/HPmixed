@@ -81,4 +81,4 @@ disp(lmefit)
 License
 =======
 
-See `LICENSE.txt` for CharFunTool licensing information.
+See `LICENSE.txt` for HPmixed licensing information.
