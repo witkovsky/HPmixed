@@ -50,4 +50,4 @@ plot(model.y,STAT_FIT.TABLE.Estimate,'o')
 grid
 xlabel('y observed')
 ylabel('y fitted')
-title('SplitPlot Data Fitted by HPMIXED')
+title('Model Data Fitted by HPMIXED')
