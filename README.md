@@ -10,7 +10,9 @@ About
 
 The HPmixed (the high performance mixed effects model toolbox) consists of a set of algorithms for fitting the linear mixed models of the form  y = X*b + Z*u + e with a simple variance componets structure by solving the Henderson's mixed model equations. 
                                                                               
-The model structure can be generated from given DATASET and FORMULA by using the developed function hpmixedmodel, which is based on functionality of the LinearMixedModels class (Statistics Toolbox and Machine Learning Toolbox, MATLAB).
+The model structure can be specified by the data vector y and the design matrices X and Z. Here, X is assumed to be a full ranked matrix and Z is typically a sparse matrix. 
+
+Alternatively, the model can be specified from the given DATASET and FORMULA by using the developed function hpmixedmodel, which is based on functionality of the LinearMixedModels class (Statistics and Machine Learning Toolbox, MATLAB).
 
 Installation and requirements
 =============================
