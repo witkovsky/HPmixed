@@ -47,6 +47,7 @@ We recommend taking a look at the Examples collection.
 
 To get a taste of what computing with HPmixed is like, try to fit LME to the standard Split-Plot data, see e.g. Stroup (1989). For that, simply type
 ```
+clear
 load dsSplitPlotData
 formula = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
 model   = hpmixedmodel(SplitPlotData,formula);
@@ -60,8 +61,21 @@ options.STAT.inferenceSpace = 'broad';
 [Lambda,options]  = getLambda({'A' 'B' },model,SplitPlotData,options);
 
 options.verbose = false;
-lmefit = hpmixed(model,options);
 STAT   = getStats(Lambda,lmefit,options)
+```
+
+HPmixed is efficient for large LME models. For example, consider the modified version of the SAS Proc HPMIXED Example 43.1 Ranking Many Random-Effect Coefficients, see Wang and Tobias (2009).
+```
+clear
+load dsAnimalData
+formula = 'Yield ~ Species + (1 | Farm) + (1 | Animal)';
+model   = hpmixedmodel(SASAnimalData,formula);
+
+options.ddfMethod = 'Satterthwaite';
+lmefit = hpmixed(model,options);
+
+disp(lmefit)
+
 ```
 
 License
