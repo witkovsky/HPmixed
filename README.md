@@ -48,9 +48,20 @@ We recommend taking a look at the Examples collection.
 To get a taste of what computing with HPmixed is like, try to fit LME to the standard Split-Plot data, see e.g. Stroup (1989). For that, simply type
 ```
 load dsSplitPlotData
-formula  = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
-model = hpmixedmodel(SplitPlotData,formula);
-lmefit = hpmixed(model) 
+formula = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
+model   = hpmixedmodel(SplitPlotData,formula);
+lmefit  = hpmixed(model) 
+```
+
+HPmixed allows to get more advanced inference from fitted LME. For example, here we illustrate one possible way how to evaluate the LSMEANS contrasts from the Split-Plot data in a broad sense inference space, for the interaction A:B.
+```
+options.STAT.inference = 'contrasts';
+options.STAT.inferenceSpace = 'broad';
+[Lambda,options]  = getLambda({'A' 'B' },model,SplitPlotData,options);
+
+options.verbose = false;
+lmefit = hpmixed(model,options);
+STAT   = getStats(Lambda,lmefit,options)
 ```
 
 License
