@@ -1,6 +1,5 @@
-%% FUNCTION blockTrace
-function tr = blockTrace(T1,T2)
-%blockTrace Computes the trace(T1*T2') where T1 and T2 are sparse
+function tr = BlockTrace(T1,T2)
+% BlockTrace Computes the trace(T1*T2') where T1 and T2 are sparse
 % matrices of dimensions (dimT1 x m) and (dimT2 x m)
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
