@@ -111,6 +111,7 @@ if ~isfield(options, 'tolZero'), options.tolZero = 1e-12; end
 if ~isfield(options, 'isExactGrad'), options.isExactGrad = true; end
 if ~isfield(options, 'isExactFIreml'), options.isExactFIreml = true; end
 if ~isfield(options, 'verbose'), options.verbose = true; end
+if ~isfield(options, 'loopsMax'), options.loopsMax = 1000; end
 if ~isfield(options, 'ExactMethodLimitNNZ')
     options.ExactMethodLimitNNZ = 40000;
 end
@@ -241,7 +242,7 @@ sig20 = zeros(nRE+1,1);
 loops = 0;
 tol = sqrt(nonZerosH0) * tol;
 covergenceCrit = norm((sig2-sig20)/sig2(end));
-while  covergenceCrit > tol
+while  covergenceCrit > tol && loops < options.loopsMax
     loops = loops + 1;
     sig20 = sig2;
     sig2 = sig20 / sig20(nRE+1);
