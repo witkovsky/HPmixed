@@ -1,11 +1,11 @@
 function [Lambda,options] = getLambda(varNames,model,dataset,options)
 % getLambda creates the coefficient matrix Lambda for LSMEANS and their
 % CONTRASTS and PAIRWISE contrasts for computing the basic t-statistics
-% resp. F-statistics and their p-values by using calcSTAT (Satterthwaite's
-% approximation of the degrees of freedom).
+% resp. F-statistics and their p-values by using the Satterthwaite's
+% approximation of the degrees of freedom.
 %
 % EXAMPLE: (LSMEANS contrasts for interaction A:B)
-%   load SplitPlotData;
+%   load dsSplitPlotData;
 %   formula  = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
 %   model = hpmixedmodel(SplitPlotData,formula);
 %
