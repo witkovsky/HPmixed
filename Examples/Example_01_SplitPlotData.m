@@ -21,8 +21,8 @@ load dsSplitPlotData
 
 %% Create the model design matrices 
 formula  = 'y ~ A + B + A:B + (1 | Block) + (1 | Block:A)';
-opts.dummyVarCode = 'reference';
-%opts.dummyVarCode = 'effects';
+%opts.dummyVarCode = 'reference';
+opts.dummyVarCode = 'effects';
 %opts.dummyVarCode = 'full';
 model = hpmixedmodel(SplitPlotData,formula,opts);
 model.Description = 'SplitPlotData: SAS Example';

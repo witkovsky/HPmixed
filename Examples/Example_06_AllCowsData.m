@@ -100,8 +100,10 @@ disp(lmefit.randomEffects.Statistics.TABLE(1:20,:))
 disp(lmefit.varianceComponents.Statistics.TABLE)
 
 %% The t-statistics for the random effects (Satterthwaite's DF)
+options.STAT.verbose = false;
+
 tic;
-STAT = getStats(Lambda,lmefit);
+STAT = getStats('random',lmefit,options);
 toc
 
 disp(STAT.TABLE(1:20,:));
