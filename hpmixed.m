@@ -15,6 +15,8 @@ function lmefit = hpmixed(model,options)
 %         G_i = sigma^2_i * eye(q_i), sigma^2_i >= 0, i = 1,...,nRE, and
 %         R = sigma^2_{nRE+1} * eye(n), sigma^2_{nRE+1} > 0.
 %
+% GITHUB: https://github.com/witkovsky/HPmixed
+%
 % SYNTAX:
 % lmefit = hpmixed(model,options)
 %
@@ -25,17 +27,17 @@ function lmefit = hpmixed(model,options)
 %                     for the fixed effects,
 % model.Z           - (n x q) full-ranked (possibly sparse) design matrix
 %                     for random effects, typically Z = [Z_1 Z_2 ... Z_nRE],
-% model.dimRE       - nRE-dimensional vector of random effects group sizes.
+% model.dimRE       - nRE-dimensional vector of random effects group sizes,
+%                     such that q = sum(dimRE).
 %
 % Alternatively, for large models it can be useful to specify the model by
-% the following properties
+% the minimal required following properties
 % model.H0          - H0 is a sparse upper triangular of the (m x m) matrix
 %                     [Z X]'*[Z X], which is the constructor for the MMEs,
 %                     where m = q + p,
 % model.ZXy         - m-vector [Z'*y; X'*y],
 % model.y2          - scalar value y2 = y'*y,
 % model.dimRE       - nRE-dimensional vector of random effects group sizes,
-% model.dimFE       - nFE-dimensional vector of fixed effects group sizes,
 % model.n           - n is number of observations, dimension of y,
 % model.p           - p is number of fixed effects, columns of X.
 %
@@ -46,16 +48,24 @@ function lmefit = hpmixed(model,options)
 % model.GroupingInfo- structure with further details on grouping variables
 % model.RandomInfo  - structure with further details on random effects
 %
-% The MODEL structure can be generated from given DATASET and FORMULA by
-% using the developed function hpmixedmodel, which is based on
-% functionality of the LinearMixedModels class (Statistics Toolbox, MATLAB
-% 2013b).
+% The MODEL structure can be generated manually as specified above, or from
+% given DATASET and FORMULA by using the developed function hpmixedmodel,
+% which is based on functionality of the LinearMixedModels class
+% (Statistics Toolbox, MATLAB 2013b or newer).
 %
-% *options* is a structure with the follwing minimal properties:
-% options.FitMethod - default (for now the only possible) method is 'REML',
-% options.tolerance - default value is sqrt(100*eps),
-% options.tolZero   - default value is 1e-12,
-% options.verbose   - default value is: true.
+% *options* is a structure with the follwing properties and default values:
+% options.FitMethod     = 'REML' (for now the only possible method is REML)
+% options.ddfMethod     = 'Satterthwaite' (also 'none, ''FaiCornelius',
+%                         'ChiSquare') 
+% options.alpha         = 0.05
+% options.tolerance     = 1e4*eps
+% options.tolZero       = 1e-12
+% options.isExactGrad   = true
+% options.isExactFIreml = true
+% options.loopsMax      = 1000
+% options.ExactLimitNNZ = 40000
+% options.isFindPerm    = true
+% options.verbose       = true
 %
 % EXAMPLE:
 % load dsSplitPlotData
@@ -64,8 +74,8 @@ function lmefit = hpmixed(model,options)
 % lmefit = hpmixed(model)
 %
 % REFERENCES:
-% Witkovský, V. (2012). Estimation, testing, and prediction regions of the
-% fixed and random effects by solving the Henderson’s mixed  model
+% WitkovskÃ½, V. (2012). Estimation, testing, and prediction regions of the
+% fixed and random effects by solving the Hendersonâ€™s mixed  model
 % equations. Measurement Science Review 12(6): 234-248. 
 % DOI: 10.2478/v10048-012-0033-6
 %
@@ -93,6 +103,7 @@ function lmefit = hpmixed(model,options)
 %         http://www.mathworks.com/matlabcentral/fileexchange/40875-ddfmixed
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
+% Revision: 14-Aug-2022 16:44:34
 % Ver.: 16-Feb-2014 14:39:28
 
 %% TICTOC start the system-time clock
@@ -110,11 +121,10 @@ if ~isfield(options, 'tolerance'), options.tolerance = 1e4*eps; end
 if ~isfield(options, 'tolZero'), options.tolZero = 1e-12; end
 if ~isfield(options, 'isExactGrad'), options.isExactGrad = true; end
 if ~isfield(options, 'isExactFIreml'), options.isExactFIreml = true; end
-if ~isfield(options, 'verbose'), options.verbose = true; end
 if ~isfield(options, 'loopsMax'), options.loopsMax = 1000; end
-if ~isfield(options, 'ExactMethodLimitNNZ')
-    options.ExactMethodLimitNNZ = 40000;
-end
+if ~isfield(options, 'ExactLimitNNZ'), options.ExactLimitNNZ = 40000; end
+if ~isfield(options, 'isFindPerm'), options.isFindPerm = true; end
+if ~isfield(options, 'verbose'), options.verbose = true; end
 
 %% CHECK the model structure
 if  isfield(model,'H0') && isfield(model,'ZXy') && isfield(model,'y2') ...
@@ -159,16 +169,24 @@ nRE = length(dimRE);
 q = sum(dimRE);
 nVC = nRE + 1;
 m = p + q;
-
-[invperm,H0,ZXy] = findperm(H0,ZXy,m,q);
-perm(invperm) = 1:m;
 H0DiagInd = 1+(0:m-1)*(m+1);
+% Changed / 14-Aug-2022 16:44:34
+% CHOL REQUIRES THAT H0 IS POSITIVE DEFINITE
+try
+    [invperm,H0,ZXy] = findperm(H0,ZXy,m,q,options.isFindPerm);
+catch
+    warning('H0 is not positive definite: Added sqrt(eps) to diagonal of H0.');
+    H0(H0DiagInd) = H0(H0DiagInd) + sqrt(eps);
+    [invperm,H0,ZXy] = findperm(H0,ZXy,m,q,options.isFindPerm);
+end
+
+perm(invperm) = 1:m;
 H0REDiagInd = H0DiagInd(invperm(1:q));
 H0REDiag = H0(H0REDiagInd);
 nonZerosH0 = nnz(H0);
 
 if options.isExactGrad && options.isExactFIreml ...
-        && (nonZerosH0 < options.ExactMethodLimitNNZ)
+        && (nonZerosH0 < options.ExactLimitNNZ)
     tol = options.tolerance;
 else
     tol = max(options.tolerance,eps^(1/2));
@@ -254,14 +272,14 @@ while  covergenceCrit > tol && loops < options.loopsMax
     
     % variance components
     if options.isExactGrad && ...
-            (nonZerosH0 < options.ExactMethodLimitNNZ)
+            (nonZerosH0 < options.ExactLimitNNZ)
         nu = zeros(nRE+1,1);
         nu(nRE+1) = n-p;
         for i = 1:nRE
             trii = sum(nonzeros(Hfac' \ Gd{i}).^2) / sig2(i);
             nu(i) = dimRE(i) - trii;
         end
-    else
+       else
         nu = sig20.* gradient(@(sig2) -2 * maxloglikFun(sig2,H0,H0REDiag,...
             H0REDiagInd,ind,nRE,n,dimRE',p,sig20),sig20,[],1:nRE);
         nu(nRE+1) = n-p;
@@ -288,7 +306,7 @@ lmefit.ModelInfo.covergenceTol = tol;
 %% Get maximum value of the REML log-likehood and the Fisher Information
 [loglik_REML,AIC,BIC]  = loglikREML(sig2,Hfac,n,p,nRE,dimRE);
 
-if options.isExactFIreml && (nonZerosH0 < options.ExactMethodLimitNNZ)
+if options.isExactFIreml && (nonZerosH0 < options.ExactLimitNNZ)
     I_REML = getFisherInfExact(lmefit);
     I_REML_used = 'Fisher Information Matrix / Exact';
 elseif ~options.isExactFIreml
@@ -349,21 +367,27 @@ end     % END OF THE MAIN FUNCTION HPMIXED
 
 
 %% FUNCTION findperm
-function [perm,H0,ZXy] = findperm(H0,ZXy,m,q)
-%function [perm,H0,ZXy] = findperm(H0,ZXy,m,q)
+function [perm,H0,ZXy,P] = findperm(H0,ZXy,m,q,isFindPerm)
+%function [perm,H0,ZXy,P] = findperm(H0,ZXy,m,q,isFindPerm)
 %FINDPERM Find optimum permutation for Cholesky factorization and rearrange
 %         (permute) columns and rows of the matrix H0 and the vector ZXy.
 
-% (c) Viktor Witkovsky (witkovsky@savba.sk)
+% (c) Viktor Witkovsky (witkovsky@savba.sk
+% Revision: 14-Aug-2022 16:44:34
 % Ver.: 06-Oct-2013 18:45:48
 
 ind = 1+(0:q-1)*(m+1);
 H0(ind) = H0(ind) + 1;
 [~,~,P] = chol(H0);
 H0(ind) = H0(ind) - 1;
-H0 = triu(P'*(H0 + triu(H0,1)')*P);
-ZXy = P'*ZXy;
-perm = (1:m)*P';
+
+if isFindPerm
+    H0 = triu(P'*(H0 + triu(H0,1)')*P);
+    ZXy = P'*ZXy;
+    perm = (1:m)*P';
+else
+    perm = (1:m);
+end
 
 end
 %% Function updateH0
@@ -371,11 +395,16 @@ function H0 = updateH0(sig2,H0,H0REDiagInd,H0REDiag,nRE,ind)
 %updateH0 - Update profiled MME equations
 %
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
+% Ver.: 14-Aug-2022 16:44:34
 % Ver.: 09-Jan-2014 21:55:07
 
 sig2 = sig2 / sig2(nRE+1);
 for i = 1:nRE
-    H0(H0REDiagInd(ind{i})) = H0REDiag(ind{i}) + 1/sig2(i);
+    if sig2(i) < sqrt(eps)
+        H0(H0REDiagInd(ind{i})) = H0REDiag(ind{i}) + sqrt(eps);
+    else
+        H0(H0REDiagInd(ind{i})) = H0REDiag(ind{i}) + 1/sig2(i);
+    end
 end
 end     % END of updateH0
 
