@@ -80,8 +80,8 @@ function result = getStats(Lambda,lmefit,options)
 %   options.STAT.alpha = 0.01;
 %   STAT_Block_LSMEANS_ITERMEDIATE = getStats(Lambda,lmefit,options)
 
-
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
+% Revision: 14-Aug-2022 16:44:34
 % Ver.: 12-Jan-2014 11:41:21
 
 %% CHECK INPUTS / OUTPUTS
@@ -169,7 +169,7 @@ elseif ischar(Lambda)
             options.STAT.ddfMethod = 'none';
             options.STAT.colnames = 'sigma2_';
             options.STAT.Description = 'FITTED variance components';
-            STAT = createTTESTtable(sig2,stdVC,Inf,nRE+1,options);            
+            STAT = createTTESTtable(sig2,stdVC,Inf,nRE+1,options);
         otherwise
             error('VW:hpmixed:getStats', ...
                 'WRONG INPUT: "Lambda" TRY: getLambda() ...')
@@ -178,12 +178,12 @@ end
 
 %% ALGORITHM
 mse = [];
-if ~isVarianceComponentsTable  
-    if isempty(I_REML)        
+if ~isVarianceComponentsTable
+    if isempty(I_REML)
         I_REML = getFisherInfApprox(lmefit);
         % I_REML_used = 'Fisher Information Matrix / Approx';
     end
-    
+
     switch lower(options.STAT.ddfMethod)
         case {'residual' 'res'}
             [estimate,std,ddf,ndf] = getStatssAndDDF(Lambda,ubeta,sig2,...
@@ -197,20 +197,25 @@ if ~isVarianceComponentsTable
             [fstat,~,ddf,ndf,mse] = getStatssAndDDF(Lambda,ubeta,sig2, ...
                 Hfac,perm,n,p,I_REML,m,dimRE,nRE,invperm,'faicornelius');
             testType = 'Ftest';
+        case {'chisquare' 'chi' 'chi-square'}
+            [chistat,~,ddf,ndf,mse] = getStatssAndDDF(Lambda,ubeta,sig2, ...
+                Hfac,perm,n,p,I_REML,m,dimRE,nRE,invperm,'chisquare');
+            testType = 'ChiSquaretest';
         otherwise
             [estimate,std,ddf,ndf] = getStatssAndDDF(Lambda,ubeta,sig2,...
                 Hfac,perm,[],[],[],[],[],[],[],'none');
             testType = 'Ttest';
     end
-    
+
     switch lower(testType)
         case 'ttest'
             STAT = createTTESTtable(estimate,std,ddf,ndf,options);
         case 'ftest'
             [STAT,mse] = createFTESTtable(fstat,mse,ddf,ndf,options);
+        case 'chisquaretest'
+            [STAT,mse] = createCHITESTtable(chistat,mse,ddf,ndf,options);
     end
 end
-
 
 %% RESULT
 result.TABLE = STAT;
@@ -230,7 +235,7 @@ function [estimate,std,ddf,ndf,mse] = getStatssAndDDF(Lambda,ubeta,sig2, ...
     Hfac,perm,n,p,I_REML,m,dimRE,nRE,invperm,method)
 % getStatssAndDDF Computes the estimates and the degrees of freedom (DDF) by
 %                the required method. Supported DDF methods are: 'none',
-%                'residual', 'satterthwaite', 'faicornelius'.
+%                'residual', 'satterthwaite', 'faicornelius', 'chisquare'.
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
 % Ver.: 12-Jan-2014 11:41:21
@@ -246,6 +251,13 @@ switch method
         Lambda = Lambda * U;
         sse = diag(S);
         std = [];
+    case {'chisquare'}
+        ndf = size(Lambda,2);
+        mse = Hfac' \ Lambda(perm,:);
+        mse = full(mse' * mse);
+        estimate = Lambda(perm,:)' * ubeta;
+        estimate = (estimate' * (mse \ estimate));
+        std = [];
     otherwise
         estimate = Lambda(perm,:)' * ubeta;
         sse = full(sum((Hfac' \ Lambda(perm,:)).^2))';
@@ -255,7 +267,7 @@ switch method
 end
 
 switch method
-    case 'none'
+    case {'none', 'chisquare'}
         ddf = Inf;
     case 'residual'
         ddf = (n - p);
@@ -268,14 +280,14 @@ switch method
             idx{ii} = startidx + (1:dimRE(ii));
             startidx = startidx + dimRE(ii);
         end
-        
+
         for ii = 1:nRE
             idx{ii} = invperm(idx{ii});
         end
-        
+
         Lambda = Lambda(perm,:);
         SqrtmHatLambda = (Hfac' \ Lambda);
-        
+
         diagSqrtmGinvDer1 = zeros(m,1);
         for ii = 1:nRE
             diagSqrtmGinvDer1(idx{ii}) = - 1 / sig2(ii);
@@ -342,7 +354,7 @@ end     % END of createTTESTtable
 
 %% Create the F-test STAT table
 function [STAT,mse] = createFTESTtable(fstat,mse,ddf,ndf,options)
-% createTTESTtable Creates a table with basic F-statistics. The results
+% createFTESTtable Creates a table with basic F-statistics. The results
 %     are presented as a dataset STAT.
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
@@ -351,7 +363,6 @@ function [STAT,mse] = createFTESTtable(fstat,mse,ddf,ndf,options)
 %% Set the variables and create the table
 alpha = options.STAT.alpha;
 %if ~isfield(options.STAT, 'grpname'), options.STAT.grpname = 'GRP'; end
-colnames = options.STAT.colnames;
 
 quantile    = finv(1-alpha,ndf,ddf);
 pval        = 1 - fcdf(fstat,ndf,ddf);
@@ -361,12 +372,35 @@ if size(ddf,1) == 1
     quantile = quantile * ones(size(fstat));
 end
 
-VarNames = {'Fstat' 'NDF' 'DDF' 'Quantile' 'pValue'};
-% STAT = dataset(fstat, ndf, ddf, quantile, pval, ...
-%     'VarNames',VarNames,'ObsNames',colnames);
+VarNames = {'Stat' 'NDF' 'DDF' 'Quantile' 'pValue'};
 
-STAT = dataset(fstat, ndf, ddf, quantile, pval, ...
-    'VarNames',VarNames);
+STAT = dataset(fstat, ndf, ddf, quantile, pval,'VarNames',VarNames);
+
+STAT.Properties.Description = options.STAT.Description;
+end
+
+%% Create the Chi-test STAT table
+function [STAT,mse] = createCHITESTtable(chistat,mse,ddf,ndf,options)
+% createCHITESTtable Creates a table with basic CHISQUARE-statistics. The results
+%     are presented as a dataset STAT.
+
+% (c) Viktor Witkovsky (witkovsky@savba.sk)
+% Revision: 14-Aug-2022 16:44:34
+% Ver.: 12-Jan-2014 11:41:21
+
+%% Set the variables and create the table
+alpha = options.STAT.alpha;
+
+quantile    = chi2inv(1-alpha,ndf);
+pval        = 1 - chi2cdf(chistat,ndf);
+
+if size(ndf,1) == 1
+    quantile = quantile * ones(size(chistat));
+end
+
+VarNames = {'Stat' 'NDF' 'DDF' 'Quantile' 'pValue'};
+
+STAT = dataset(chistat, ndf, ddf, quantile, pval,'VarNames',VarNames);
 
 STAT.Properties.Description = options.STAT.Description;
 end     % END of createTTESTtable
