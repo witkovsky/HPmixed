@@ -1,4 +1,4 @@
-function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,idxSessions)
+function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,options)
 % hpmixedmodel_Simple Creates a simple (very specific hard-wired)
 %  linear mixed model for given continuous variables fmri, AMP, SLP, aSLP,
 %  TMP, and the nominal variable session, specified with the model formula:
@@ -12,8 +12,6 @@ function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,idxSe
 %
 % SYNTAX:
 %  model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP)
-%  or
-%  model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions)
 %
 % INPUTS:
 %  fmri - n-dimensional vector of the observed fmri signal
@@ -21,17 +19,8 @@ function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,idxSe
 %  SLP  - n-dimensional vector of the observed SLP signal
 %  aSLP - n-dimensional vector of the observed aSLP signal
 %  TMP  - n-dimensional vector of the observed TMP signal
-%  n    - length of the vector variables. If empty, the default value is
-%         n = 235600; 
-%  p    - number of columns of the (nxp)-matrix X (the fixed effects design
-%         matrix). If empty, the default value is p = 5;  
-%  q    - number of columns of the (nxq)-matrix Z (the random effects
-%         design matrix). If empty, the default value is q = 5* 152 = 760
-%         190; 
-%  nSessions - number of sessions. If empty, the default value is 
-%         nSessions = 152.
-%  idxSessions - the index vector used to generate sparse Z matrices. If
-%         empty the index vector is calculate by the algorithm. 
+% *options* is a structure with the follwing properties and default values:
+%  options.dummyVarCode = 'effects' (also 'reference' or 'full').
 % 
 % EXAMPLE
 % load PainData.mat
@@ -40,11 +29,7 @@ function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,idxSe
 % SLP = PainData.SLP;
 % aSLP = PainData.aSLP;
 % TMP = PainData.TMP;
-% n = 235600;
-% p = 5;
-% q = 760;
-% nSessions = 152;
-% model   = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions);
+% model   = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP);
 % clear options
 % options.ddfMethod = 'Satterthwaite';
 % lmefit  = hpmixed(model,options);
@@ -58,15 +43,20 @@ function model = hpmixedmodel_Simple(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,idxSe
 % disp(anovaF.TABLE);
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
-% Ver.: 16-Aug-2022 09:29:54
+% Ver.: 18-Aug-2022 20:03:19
 
 %% CHECK the inputs
-narginchk(5,10);
-if nargin <  6, n = 235600; end
-if nargin <  7, p = 5; end
-if nargin <  8, q = 760; end
-if nargin <  9, nSessions = 152; end
-if nargin <  10, idxSessions = repmat((1:nSessions),1,n/nSessions); end
+narginchk(5,6);
+
+if nargin < 6, options = []; end
+if ~isfield(options, 'dummyVarCode'), options.dummyVarCode = 'effects'; end
+
+% Set the fixed parameters specific for the considered model
+n = 235600;
+p = 5; 
+q = 760; 
+nSessions = 152; 
+idxSessions = repmat((1:nSessions),1,n/nSessions); 
 
 model.Description = 'Simple model';
 model.Formula.char = 'fmri ~ AMP + SLP + aSLP + TMP + (1 | session) + (AMP - 1 | session) + (SLP - 1 | session) + (aSLP - 1 | session) + (TMP - 1 | session)';
@@ -107,12 +97,10 @@ X = [ones(n,1) AMP(:) SLP(:) aSLP(:) TMP(:)];
 %% model.Z is optional model output / not necessary for further computation
 % Create the Z matrix
 
-
 % HERE, the (nxq)-matrix Z (the random effects design matrix) consists of
 % q = 5*152 columns / 152 columns for each random effect:
 % 1. (1|session), 2. (AMP|session), 3. (SLP|session), 4. (aSLP|session), 5.
 % (TMP|session)
-
 
 % Z1 is (nx152)-matrix related to the 1st random effect (1|session)
 Z1 = sparse(1:n,idxSessions,1,n,nSessions,n);
@@ -128,7 +116,6 @@ Z4 = sparse(1:n,idxSessions,aSLP,n,nSessions,n);
 
 % Z5 is (nx152)-matrix related to the 5th random effect (TMP|session)
 Z5 = sparse(1:n,idxSessions,TMP,n,nSessions,n);
-
 
 % This is concatenaded (n*760)-matrix Z (the design matrix for all random
 % effects)  
