@@ -1,4 +1,4 @@
-function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSubjects,idxSessions,idxSubjects)
+function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,options)
 % hpmixedmodel_Complex Creates the complex (very specific hard-wired)
 %  linear mixed model for given continuous variables fmri, AMP, SLP, aSLP,
 %  TMP, and the nominal variables Subj and session, specified with the
@@ -8,15 +8,15 @@ function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSub
 %              (AMP - 1 | session)  + (SLP - 1 | session) + ...
 %              (aSLP - 1 | session) + (TMP - 1 | session)';
 %
-%  Here, the method for creating the dummy variables is based on
-%  options_simple.dummyVarCode = 'reference' (if used in the function
-%  hpmixedmodel). 
+%  Here, the method for creating the dummy variables is based on the value
+%  set by options.dummyVarCode (default is options.dummyVarCode = 'effects'
+%  alternative choice is options.dummyVarCode = 'reference' or
+%  options.dummyVarCode = 'full').    
 %
 % SYNTAX:
 %  model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP)
 %  or
-%  model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP, ...
-%            n,p,q,nSessions,nSubjects,idxSessions,idxSubjects)
+%  model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,options)
 %
 % INPUTS:
 %  fmri - n-dimensional vector of the observed fmri signal
@@ -24,21 +24,8 @@ function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSub
 %  SLP  - n-dimensional vector of the observed SLP signal
 %  aSLP - n-dimensional vector of the observed aSLP signal
 %  TMP  - n-dimensional vector of the observed TMP signal
-%  n    - length of the vector variables. If empty, the default value is
-%         n = 235600; 
-%  p    - number of columns of the (nxp)-matrix X (the fixed effects design
-%         matrix). If empty, the default value is p = 5 + 5*(37-1) = 190;  
-%  q    - number of columns of the (nxq)-matrix Z (the random effects
-%         design matrix). If empty, the default value is q = 5* 152 = 760
-%         190; 
-%  nSessions - number of sessions. If empty, the default value is 
-%         nSessions = 152.  
-%  nSubjects - number of subjects. If empty, the default value is 
-%         nSubjects = 38. 
-%  idxSessions - the index vector used to generate sparse Z matrices. If
-%         empty the index vector is calculate by the algorithm. 
-%  idxSubjects - the index vector used to generate sparse X matrices. If
-%         empty the index vector is calculate by the algorithm.
+% *options* is a structure with the follwing properties and default values:
+%  options.dummyVarCode = 'effects' (also 'reference' or 'full').
 % 
 % EXAMPLE
 % load PainData.mat
@@ -47,12 +34,7 @@ function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSub
 % SLP = PainData.SLP;
 % aSLP = PainData.aSLP;
 % TMP = PainData.TMP;
-% n = 235600;
-% p = 190;
-% q = 760;
-% nSessions = 152;
-% nSubjects = 38;
-% model   = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSubjects);
+% model   = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP);
 % clear options
 % options.ddfMethod = 'Satterthwaite';
 % lmefit  = hpmixed(model,options);
@@ -66,22 +48,24 @@ function model = hpmixedmodel_Complex(fmri,AMP,SLP,aSLP,TMP,n,p,q,nSessions,nSub
 % disp(anovaF.TABLE);
 
 % (c) Viktor Witkovsky (witkovsky@savba.sk)
-% Ver.: 16-Aug-2022 09:29:54
+% Ver.: '18-Aug-2022 20:03:19
 
 %% CHECK the inputs
-narginchk(5,12);
+narginchk(5,6);
 
-if nargin <  6, n = 235600; end
-if nargin <  7, p = 190; end
-if nargin <  8, q = 760; end
-if nargin <  9, nSessions = 152; end
-if nargin <  10, nSubjects = 38; end
-if nargin <  11, idxSessions = repmat((1:nSessions),1,n/nSessions); end
-if nargin <  12
-    auxid = repmat((1:nSubjects),4,1);
-    auxid = auxid(:)';
-    idxSubjects = repmat(auxid,1,n/nSessions);
-end
+if nargin < 6, options = []; end
+if ~isfield(options, 'dummyVarCode'), options.dummyVarCode = 'effects'; end
+
+% Set the fixed parameters specific for the considered model
+n = 235600;
+p = 190; 
+q = 760; 
+nSessions = 152; 
+nSubjects = 38; 
+idxSessions = repmat((1:nSessions),1,n/nSessions); 
+auxid = repmat((1:nSubjects),4,1);
+auxid = auxid(:)';
+idxSubjects = repmat(auxid,1,n/nSessions);
 
 model.Description = 'Complex model';
 model.Formula.char = 'fmri ~ AMP + SLP + aSLP + TMP + Subj + AMP:Subj + SLP:Subj+ aSLP:Subj+ TMP:Subj + (1 | session) + (AMP - 1 | session)+ (SLP - 1 | session) + (aSLP - 1 | session)+ (TMP - 1 | session)';
@@ -161,23 +145,36 @@ X0 = [ones(n,1) AMP(:) SLP(:) aSLP(:) TMP(:)];
 
 % X1 is (nx37)-matrix related to the fixed effects of Subj
 X1 = sparse(1:n,idxSubjects,1,n,nSubjects,n); 
-X1 = X1(:,2:end);
+
 % X2 is (nx37)-matrix related to the fixed effects of AMP:Subj
 X2 = sparse(1:n,idxSubjects,AMP,n,nSubjects,n); 
-X2 = X2(:,2:end);
+
 % X3 is (nx37)-matrix related to the fixed effects of SLP:Subj
 X3 = sparse(1:n,idxSubjects,SLP,n,nSubjects,n); 
-X3 = X3(:,2:end);
+
 % X4 is (nx37)-matrix related to the fixed effects of aSLP:Subj
 X4 = sparse(1:n,idxSubjects,aSLP,n,nSubjects,n); 
-X4 = X4(:,2:end);
+
 % X5 is (nx37)-matrix related to the fixed effects of TMP:Subj
 X5 = sparse(1:n,idxSubjects,TMP,n,nSubjects,n); 
-X5 = X5(:,2:end);
+
+if strcmp(options.dummyVarCode,'effects')
+    X1 = X1 - X1(:,nSubjects); X1(:,end) = [];
+    X2 = X2 - X2(:,nSubjects); X2(:,end) = [];
+    X3 = X3 - X3(:,nSubjects); X3(:,end) = [];
+    X4 = X4 - X4(:,nSubjects); X4(:,end) = [];
+    X5 = X5 - X5(:,nSubjects); X5(:,end) = [];
+elseif strcmp(options.dummyVarCode,'reference')
+    X1 = X1(:,2:end);
+    X2 = X2(:,2:end);
+    X3 = X3(:,2:end);
+    X4 = X4(:,2:end);
+    X5 = X5(:,2:end);
+% else options.dummyVarCode = 'full'
+end
 
 % This is concatenaded (n*190)-matrix X (the design matrix for all fixed
 % effects) 
-
 X = [X0 X1 X2 X3 X4 X5];
 
 % optional output
