@@ -64,13 +64,29 @@ pS = size(SpeciesName,1);
 pF = size(FarmName,1);
 
 % Create the full-ranked design matrix X
+% We use 'reference' method to create dummy variables - hence here we skip
+% the first variable
 rows = (1:n)';
-cols = 1;
-X = sparse(rows,1,1,n,cols);
-cols = pS-1;
-X(rows,1+(1:cols)) = sparse(rows(jS~=1),(jS(jS~=1)-1),1,n,cols);
-cols = pS*(pF-1);
-X(rows,pS+(1:cols)) = sparse(rows(jF~=1),(jFS(jF~=1)-pS),1,n,cols);
+
+% number of linearly independent columns of the full-ranked matrix X
+ncols = 1 + (pS-1) + (pS-1)*(pF-1);
+
+% Column 1: [ Intercept ]
+X = sparse(rows,1,1,n,ncols);
+
+% Columns 2-5 of X: [Species_2, Species_3, Species_4, Species_5]
+ncolSpecies = pS-1;
+colsSpecies  = 1 + (1:ncolSpecies);
+X(rows,colsSpecies) = sparse(rows(jS~=1),(jS(jS~=1)-1),1,n,ncolSpecies);
+
+% Columns 6-401 of X: [Species:Farm_1, ... , Species:Farm_396]
+% The generated columns of different combinations of Species and Farm such
+% that Species ~= 1 and Farm ~=1 
+ncolSpeciesFarm = (pS-1)*(pF-1);
+colSpeciesFarm  = 1 + ncolSpecies + (1:ncolSpeciesFarm);
+idx1 = (jF~=1&jS~=1);
+[~,~,idx2] = unique(jFS(idx1));
+X(rows,colSpeciesFarm) = sparse(rows(idx1),idx2,1,n,ncolSpeciesFarm);
 
 % RE design matrix: Z
 [AnimalName,~,j] = unique(AllCowsData.Animal);
@@ -87,8 +103,8 @@ model.Description = 'SAS Animal Data / All Cows in Canada';
 
 %% Fit the linear mixed model by HPMIXED with limitted  output
 opts.verbose = false;
-opts.ddfMethod = 'residual';
-% opts.ddfMethod = 'Satterthwaite';
+%opts.ddfMethod = 'residual';
+opts.ddfMethod = 'Satterthwaite';
 % opts.isExactGrad = 0;
 opts.isExactFIreml = 0;
 lmefit = hpmixed(model,opts);
